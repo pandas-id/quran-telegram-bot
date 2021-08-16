@@ -11,7 +11,7 @@ import os
 
 
 # inisialisasi
-token   = '1693919281:AAGrn_PkoU8iQq-lm1qD9vL5kPjYjW8iRbQ'
+token   = os.environ['TOKEN']
 bot     = Bot(token)
 
 web   = Flask(__name__)
