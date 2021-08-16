@@ -6,15 +6,16 @@ from telepot import Bot, exception, message_identifier
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 from flask import Flask, request
 from src.quran import Quran
+from pprint import pprint
 import os
 
 
 # inisialisasi
-token   = 'your token'
+token   = '1603495571:AAHl0H8oVK1ciPhndClLxUbu1jFALCbG7bc'
 bot     = Bot(token)
 
 web   = Flask(__name__)
-HOST = '<host>'
+HOST = 'https://quran-telegram-bot.herokuapp.com'
 
 
 class App:
@@ -272,6 +273,7 @@ def index():
 if __name__ == '__main__':
     try:
         bot.setWebhook(HOST)
-    except exception.TooManyRequestsError:
+    except telepot.exception.TooManyRequestsError:
         pass
-    web.run(host='0.0.0.0', port=os.environ.get('PORT', 5000), debug=True)
+    # start
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
