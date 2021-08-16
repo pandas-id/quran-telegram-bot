@@ -11,7 +11,7 @@ import os
 
 
 # inisialisasi
-token   = os.environ['TOKEN'] # ganti nilai varibel dengan token bot Anda
+token   = '1693919281:AAGrn_PkoU8iQq-lm1qD9vL5kPjYjW8iRbQ' # ganti nilai varibel dengan token bot Anda
 bot     = Bot(token)
 
 web   = Flask(__name__)
