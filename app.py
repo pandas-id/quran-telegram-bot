@@ -1,22 +1,24 @@
 """
 Date: 24 Februari 2021
+Last Update: 1 Oktober 2022
 """
 
 from telepot import Bot, exception, message_identifier
-from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from flask import Flask, request
 from src.quran import Quran
 from pprint import pprint
 import os
+import json
 
 
 # inisialisasi
-token   = os.environ['TOKEN'] # ganti nilai varibel dengan token bot Anda
+# token   = os.environ['TOKEN'] # ganti nilai varibel dengan token bot Anda
+token = '1603495571:AAHl0H8oVK1ciPhndClLxUbu1jFALCbG7bc'
 bot     = Bot(token)
 
 web   = Flask(__name__)
-HOST = 'https://quran-telegram-bot.herokuapp.com'
-
+HOST = open('./host', 'r').read().replace('\n', '')
 
 class App:
 
@@ -24,13 +26,15 @@ class App:
         self.__chat_id = None
         self.__username = None
         self.__quran = Quran()
+        # self.__quran_id = json.loads(quran_data)
+        self.__chapters_data = self.__quran.chapters_data()
 
         # konfigurasi
         self._terjemahan = True
         self._bacaan = True
 
         # inisialisasi varibel untuk penanganan perintah surah
-        self._surah = None
+        self._chapter = None
         self._index = 0
         self._pages_data = []
         self._messages = []
@@ -43,53 +47,41 @@ class App:
         message_id = msg['message']['message_id']
         command         = msg['message']['text']
 
-        if command == '/start':
-            self.__handling_start_command()
-        elif command == '/help':
-            self.__handling_help_command()
-        elif command == '/daftarsurah':
-            self.__handling_daftarsurah_command()
-        elif '/surah' in command:
-            self.__handling_surah_command(cmd=command)
-        elif '/quran' in command:
-            self.__handling_quran_command(command, message_id)# }}}
+        if command[0] == '/':
+            if command == '/start':
+                self.__handling_start_command()
+        else:
+            self.__send_script_of_chapter(command)
+
+        # }}}
 
     # handind start command{{{
     def __handling_start_command(self):
         mess = f'Assalamualaikum <b>{self.__username}</b>, selamat datang di Al-Quran Bot.'
         bot.sendMessage(self.__chat_id, mess, parse_mode='html')
-        self.__handling_help_command()# }}}
 
-    # handling help command{{{
-    def __handling_help_command(self):
-        mess = f'''
-Beberapa perintah yang dapat Anda gunakan:
+        # send keyboard button
+        chapter_names = list(self.__chapters_data.keys())
+        keyboard = []
+        while len(chapter_names) != 0:
+            for _ in range(1):
+                keyboard.append([
+                    KeyboardButton(text=chapter_names[0]),
+                    KeyboardButton(text=chapter_names[1])
+                ])
+            del chapter_names[0:2]
 
+        keyboard = ReplyKeyboardMarkup(keyboard=keyboard)
 
-/daftarsurah - lihat semua surah di Al-Quran
+        bot.sendMessage(self.__chat_id, 'Silahakan pilihi nama surah yang ingin Anda baca.', reply_markup=keyboard)#}}}
 
-<b>Surah</b>
-/surah [ <u>nama surah</u> ]
-<i>contoh</i>
-/surah al-falaq - lihat surah Al-Falaq
-
-<b>Quran</b>
-/quran [ <u>nama surah</u> ] [ <u>ayat</u> ]
-<i>contoh</i>
-/quran al-fatihah 3 - lihat surah Al-Fatihah ayat ke-3
-
-
-~ @PandasID
-        '''
-        bot.sendMessage(self.__chat_id, mess, parse_mode='html')# }}}
-
-    # handing daftarsurah command{{{
-    def __handling_daftarsurah_command(self):
-        mess = ''
-        daftar_surah = self.__quran.daftar_surah()['data']
-        for data in daftar_surah:
-            mess += str((daftar_surah.index(data)+1)) + '. ' + data + '\n'
-        bot.sendMessage(self.__chat_id, mess)# }}}
+    def __send_script_of_chapter(self, chapter):
+        self._chapter = chapter
+        r = self.__create_page()
+        if r:
+            self.__generate_message()
+            markup = self.__create_reply_markup()
+            self._identifier = bot.sendMessage(self.__chat_id, self._messages[self._index], reply_markup=markup)
 
     # reply markup{{{
     def __create_reply_markup(self):
@@ -116,35 +108,16 @@ Beberapa perintah yang dapat Anda gunakan:
         ])
         return markup# }}}
 
-    # handling surah command{{{
-    def __handling_surah_command(self, cmd):
-        cmds = cmd.split(' ')
-
-        if len(cmds) > 1:
-            self._surah = cmds[1]
-            r = self.__create_page() # buat halaman
-            if r:
-                self.__generate_message()
-                markup = self.__create_reply_markup()
-                self._identifier = bot.sendMessage(self.__chat_id, self._messages[self._index], reply_markup=markup)
-        else:
-            mess = """
-<b>Surah</b>
-/surah [ <u>nama surah</u> ]
-<i>contoh</i>
-/surah al-falaq - lihat surah Al-Falaq
-"""
-            bot.sendMessage(self.__chat_id, mess, parse_mode='html')#}}}
 
     # create page{{{
     def __create_page(self, ayat=None):
-        resp  = self.__quran.surah(surah=self._surah, ayat=ayat)
+        verses = self.__quran.verses_of_chapter(chapter=self.__chapters_data[self._chapter], verse_id=ayat)
 
-        if resp.get('error'):
-            if resp['message'] == 'surah tidak ditemukan':
-                mess = f"Surah *{resp['surah']}* tidak ditemukan.Coba lihat /daftarsurah."
-            elif resp['message'] == 'ayat tidak ditemukan':
-                mess = f"Ayat ke-*{resp['verse_requests']}* pada surah *{resp['surah']}* tidak tersedia.Surah *{resp['surah']}* hanya terdiri atas *{resp['number_of_verses']}* ayat."
+        if verses.get('error'):
+            if verses['error']['message'] == 'chapter not found':
+                mess = f"Surah *{verses['surah']}* tidak ditemukan.Coba lihat /daftarsurah."
+            elif verses['message'] == 'verse not found':
+                mess = f"Ayat ke-*{verses['verse_requests']}* pada surah *{verses['surah']}* tidak tersedia.Surah *{verses['surah']}* hanya terdiri atas *{verses['number_of_verses']}* ayat."
 
             bot.sendMessage(self.__chat_id, mess, parse_mode='Markdown')
             return False
@@ -153,15 +126,15 @@ Beberapa perintah yang dapat Anda gunakan:
             self._index = 0 # kembalikan index
             mess  = ''
             page = []
-            for data in resp['data']:
-                lenms = len(data['arabic']) + len(data['bacaan']) + len(data['arti'])
+            for id in verses:
+                lenms = len(verses[id]['arabic']) + len(verses[id]['translate']) + len(verses[id]['meaning'])
 
                 if lenms > 2000:
                     if len(page) != 0:
                         self._pages_data.append(page)
                         page = []
 
-                    page.append(data)
+                    page.append(verses[id])
                     self._pages_data.append(page)
                     page = []
                     mess = ''
@@ -170,8 +143,8 @@ Beberapa perintah yang dapat Anda gunakan:
                     mess = ''
                     page = []
 
-                mess += data['arabic'] + data['bacaan'] + data['arti']
-                page.append(data)
+                mess += verses[id]['arabic'] + verses[id]['translate'] + verses[id]['meaning']
+                page.append(verses[id])
 
             self._pages_data.append(page)
             return True# }}}
@@ -184,9 +157,9 @@ Beberapa perintah yang dapat Anda gunakan:
             for data in page:
                 mess += data['arabic']
                 if self._bacaan:
-                    mess += '\n\n' + data['bacaan']
+                    mess += '\n\n' + data['translate']
                 if self._terjemahan:
-                    mess += '\n\n' + data['arti']
+                    mess += '\n\n' + data['meaning']
 
                 mess += '\n\n\n'
             self._messages.append(mess)
@@ -222,28 +195,6 @@ Beberapa perintah yang dapat Anda gunakan:
         self.__generate_message()
         markup = self.__create_reply_markup()
         bot.editMessageText(message_identifier(self._identifier), self._messages[self._index], reply_markup=markup)# }}}
-
-    # handling quran command{{{
-    def __handling_quran_command(self, cmd, mess_id):
-        cmds = cmd.split(' ')
-
-        if len(cmds) > 2 and len(cmds) == 3:
-            self._surah = cmds[1]
-            ayat = cmds[2]
-
-            if ayat.isdecimal():
-                r = self.__create_page(ayat=int(ayat))
-                if r:
-                    self.__generate_message()
-                    bot.sendMessage(self.__chat_id, self._messages[0], reply_to_message_id=mess_id)
-        else:
-            mess = """
-<b>Quran</b>
-/quran [ <u>nama surah</u> ] [ <u>ayat</u> ]
-<i>contoh</i>
-/quran al-fatihah 3 - lihat surah Al-Fatihah ayat ke-3
-"""
-            bot.sendMessage(self.__chat_id, mess, parse_mode='html')# }}}
 
     # main markup handler{{{
     def main_markup_handler(self, msg):
