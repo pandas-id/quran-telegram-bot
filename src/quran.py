@@ -1,76 +1,64 @@
 """
 Date: 17 Februari 2021
+Last Update: 2 Oktober 2022
 """
 
 from bs4 import BeautifulSoup
 from requests import get
-import re
-from pprint import pprint
-
 
 class Quran:
 
-    __URL = 'https://litequran.net'
+    __URL = 'https://litequran.net/'
 
     def __init__(self):
         self._response = {
                 'data'  : []
             }
 
-    def daftar_surah(self):
-        del self._response['data'][0:] # hapus isi data jika ada
+    def chapters_data(self):
+        data = {}
+
         resp = get(self.__URL).text
         pars = BeautifulSoup(resp, 'html.parser')
 
         ol = pars.find('ol', {'class':'list'})
-        daftar = ol.find_all('a')
-        for a in daftar:
-            nama_surah = a.string
-            self._response['data'].append(nama_surah)
-        return self._response
+        lists = ol.find_all('a')
+        for list in lists:
+            chapter_name = list.string
+            data[chapter_name] = list['href']
 
-    def surah(self, surah, ayat=None):
-        del self._response['data'][0:] # hapus isi data jika ada
-        resp = get(self.__URL+'/'+surah.lower()).text
-        pars = BeautifulSoup(resp, 'html.parser')
+        return data
 
-        ol  = pars.find('ol')
-        if ol is not None:
-            li = ol.find_all('li')
-        else:
-            self._response['error']   = True
-            self._response['message'] = "surah tidak ditemukan"
-            self._response['surah']   = surah
+    def verses_of_chapter(self, chapter, verse_id=None ):
+        verses_data = {}
+        resp = get(self.__URL+chapter)
+
+        if resp.status_code == 200:
+            pars = BeautifulSoup(resp.text, 'html.parser')
+        elif resp.status_code == 404:
+            self._response['error'] = {'message': 'chapter not found'}
             return self._response
 
-        for data in li:
-            if ayat is not None and type(ayat) is int:
-                if len(li) >= ayat:
-                    if li.index(data) == ayat-1:
-                        arabic = data.find('span', {'class':'ayat'}).string
-                        bacaan = data.find('span', {'class':'bacaan'}).string
-                        arti   = data.find('span', {'class':'arti'}).string
-                        self._response['error']   = False
-                        self._response['data'].append(dict(arabic=arabic, bacaan=bacaan, arti=arti))
-                        break
-                else:
-                    self._response['error'] = True
-                    self._response['message'] = "ayat tidak ditemukan"
-                    self._response['surah'] = surah
-                    self._response['number_of_verses'] = len(li)
-                    self._response['verse_requests'] = ayat
-                    break
+        ol  = pars.find('ol')
+
+        id = 1
+        for verse_html in ol.find_all('li'):
+            arabic = verse_html.find('p', {'class':'arabic'}).text
+            translate = verse_html.find('p', {'class':'translate'}).text
+            meaning   = verse_html.find('p', {'class':'meaning'}).text
+
+            verses_data[id] = dict(arabic=arabic, translate=translate, meaning=meaning)
+            # verses_data.append(, id=id))
+            id += 1
+
+        if verse_id is not None and type(verse_id) is int:
+            if verse_id > len(verses_data):
+                self._response['error'] = {
+                    'message': 'verse not found',
+                    'number_of_verses': len(verses_data)
+                }
+                return self._response
             else:
-                arabic = data.find('span', {'class':'ayat'}).string
-                bacaan = data.find('span', {'class':'bacaan'}).string
-                arti   = data.find('span', {'class':'arti'}).string
+                return verses_data[verse_id]
 
-                self._response['error']   = False
-                self._response['data'].append(dict(arabic=arabic, bacaan=bacaan, arti=arti))
-        return self._response
-
-
-if __name__ == '__main__':
-    quran = Quran()
-    m = quran.surah('al-fatihah')
-    pprint(m)
+        return verses_data
