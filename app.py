@@ -13,12 +13,11 @@ import json
 
 
 # inisialisasi
-# token   = os.environ['TOKEN'] # ganti nilai varibel dengan token bot Anda
-token = '1603495571:AAHl0H8oVK1ciPhndClLxUbu1jFALCbG7bc'
+token   = os.environ['TOKEN'] # ganti nilai varibel dengan token bot Anda
 bot     = Bot(token)
 
 web   = Flask(__name__)
-HOST = open('./host', 'r').read().replace('\n', '')
+HOST = 'https://quran-telegram-bot.herokuapp.com/'
 
 class App:
 
